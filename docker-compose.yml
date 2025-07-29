@@ -1,0 +1,16 @@
+services:
+  gdelt_jupyter:
+    build: .
+    container_name: gdelt_jupyter
+    user: jupyter
+    volumes:
+      - ./:/workspace
+    ports:
+      - "8888:8888"
+    command: >
+      jupyter notebook
+      --ip=0.0.0.0
+      --port=8888
+      --no-browser
+      --NotebookApp.token=
+      --NotebookApp.password=
