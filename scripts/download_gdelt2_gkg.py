@@ -10,7 +10,7 @@ def generate_timestamps(start_date, end_date, interval_minutes=15):
         yield current.strftime("%Y%m%d%H%M%S")
         current += timedelta(minutes=interval_minutes)
 
-def download_gdelt2_gkg(start_date, end_date, output_dir="./data/raw/gdelt_2_0/gkg"):
+def download_gdelt2_gkg(start_date, end_date, output_dir="./data/raw"):
     os.makedirs(output_dir, exist_ok=True)
     for timestamp in generate_timestamps(start_date, end_date):
         url = f"http://data.gdeltproject.org/gdeltv2/{timestamp}.gkg.csv.zip"
