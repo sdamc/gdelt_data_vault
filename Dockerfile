@@ -1,32 +1,43 @@
-FROM python:3.11-slim-bookworm
+FROM openjdk:11-slim
 
-# Atualiza o sistema e instala dependências mínimas
+# ==== Versões ====
+ENV SPARK_VERSION=4.0.1
+ENV HADOOP_VERSION=hadoop3
+ENV SPARK_HOME=/opt/spark
+ENV PATH="$PATH:$SPARK_HOME/bin"
+ENV PYSPARK_PYTHON=python3
+
+# ==== Dependências ====
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-        tzdata \
-        libstdc++6 \
-        libffi-dev \
-        ca-certificates \
-        && apt-get dist-upgrade -y && \
+        curl \
+        bash \
+        python3 \
+        python3-pip \
+        ca-certificates && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-# Criação de usuário não-root seguro
-RUN groupadd -r jupyter && useradd -r -g jupyter -m -d /home/jupyter jupyter
+# ==== Spark ====
+RUN curl -fsSL https://dlcdn.apache.org/spark/spark-4.0.1/spark-4.0.1-bin-hadoop3.tgz \
+    | tar -xz -C /opt && \
+    mv /opt/spark-4.0.1-bin-hadoop3 $SPARK_HOME
 
-# Define variáveis de ambiente
-ENV HOME=/home/jupyter
+# ==== Python packages ====
+RUN pip3 install --no-cache-dir \
+    notebook \
+    pandas \
+    pyspark \
+    duckdb \
+    tqdm
 
-# Instala pacotes Python com versão fixada
-RUN pip install --upgrade pip && \
-    pip install --no-cache-dir \
-        notebook==7.0.6 \
-        pandas==2.1.4 \
-        requests==2.31.0 \
-        tqdm==4.66.1
+# ==== Usuário não-root ====
+RUN useradd -ms /bin/bash jupyter && \
+    mkdir -p /workspace && \
+    chown -R jupyter:jupyter /workspace
+USER jupyter
+WORKDIR /workspace
 
-# Cria diretório de trabalho com permissões
-RUN mkdir -p /workspace && chown -R jupyter:jupyter /workspace
-RUN mkdir -p $HOME/.jupyter && chown -R jupyter:jupyter $HOME/.jupyter
-
+# ==== Jupyter ====
+EXPOSE 8888
 CMD ["jupyter", "notebook", "--ip=0.0.0.0", "--port=8888", "--no-browser", "--NotebookApp.token=", "--NotebookApp.password="]
