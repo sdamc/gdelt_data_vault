@@ -1,11 +1,42 @@
 version: '3.8'
 
 services:
-  gdelt_jupyter:
-    build: .
-    container_name: gdelt_jupyter
+  jupyter_spark:
+    build:
+      context: .
+      dockerfile: Dockerfile.spark
+    container_name: jupyter_spark
     user: jupyter
     ports:
       - "8888:8888"
     volumes:
+      - ./:/workspace 
+    restart: unless-stopped
+
+  dbt_duckdb:
+    build:
+      context: .
+      dockerfile: Dockerfile.dbt
+    image: dbt-duckdb:1.7
+    container_name: dbt_duckdb
+    volumes:
       - ./:/workspace
+    working_dir: /workspace
+    entrypoint: ["tail", "-f", "/dev/null"]
+    restart: unless-stopped
+
+  airflow:
+    image: apache/airflow:2.7.1-python3.10
+    container_name: airflow
+    depends_on:
+      - dbt_duckdb
+    environment:
+      - AIRFLOW__CORE__LOAD_EXAMPLES=False
+      - AIRFLOW__CORE__EXECUTOR=SequentialExecutor
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=sqlite:////opt/airflow/airflow.db
+    volumes:
+      - ./:/workspace
+    ports:
+      - "8080:8080"
+    command: standalone
+    restart: unless-stopped

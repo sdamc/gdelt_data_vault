@@ -3,8 +3,8 @@ import pandas as pd
 import re
 
 def filter_gkg_for_pld(
-    input_dir="./data/raw", 
-    output_dir="./data/bronze/",
+    input_dir="./data/bronze", 
+    output_dir="./data/bronze/gkg/aml",
     delete_after_transform=True
     ):
 

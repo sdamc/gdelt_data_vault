@@ -1,0 +1,25 @@
+FROM python:3.11-slim
+
+# Atualiza pacotes e instala dependências mínimas
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    curl \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# Corrige erro do protobuf
+RUN pip install protobuf==3.20.3
+
+# Instala o DBT core + plugin DuckDB
+RUN pip install --no-cache-dir \
+    dbt-core==1.7.9 \
+    dbt-duckdb==1.7.1
+
+# Instala DuckDB CLI (linha de comando) corretamente
+RUN curl https://install.duckdb.org | sh && \
+    echo 'export PATH="/root/.duckdb/cli/latest:$PATH"' >> ~/.bashrc
+
+# Cria diretório de trabalho
+WORKDIR /usr/app
+
+# Comando default
+CMD ["dbt", "--help"]

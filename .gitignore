@@ -1,3 +1,5 @@
 # Ignore all contents of data/
 data/*
+workspace/data/
+workspace/logs/
 .ipynb_checkpoints
