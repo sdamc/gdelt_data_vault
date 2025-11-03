@@ -1,1 +1,8 @@
 profiles.yml
+/target
+dbt_packages/
+# opcional: logs e artefatos locais
+logs/
+*.log
+# Jupyter checkpoints
+.ipynb_checkpoints/
