@@ -1,0 +1,10 @@
+version: 2
+
+sources:
+  - name: staging  # nome lógico da source
+    schema: public  # schema atual onde a tabela foi criada (ajuste para 'aml' se mover a tabela)
+    database: gdelt  # nome real do banco conforme \c gdelt
+    tables:
+      - name: staging_gkg_corruption
+        description: Tabela de staging carregada manualmente a partir da bronze (GKG filtrado).
+        loaded_at_field: date_id  # opcional para freshness tests futuros

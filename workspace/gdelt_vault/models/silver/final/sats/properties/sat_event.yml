@@ -1,0 +1,40 @@
+version: 2
+
+models:
+  - name: sat_event
+    description: Satélite contendo detalhes do evento (temas, pessoas, organizações).
+    columns:
+      - name: event_hk
+        description: Hash key de referência ao hub_event.
+        tests:
+          - not_null
+          - relationships:
+              to: ref('hub_event')
+              field: event_hk
+
+      - name: gkg_id
+        description: GKG ID original.
+
+      - name: themes
+        description: Lista de temas (coluna 8).
+
+      - name: locations
+        description: Localizações extraídas.
+
+      - name: persons
+        description: Pessoas mencionadas.
+
+      - name: organizations
+        description: Organizações mencionadas.
+
+      - name: tone
+        description: Sentimento (V2Tone).
+
+      - name: GCAM
+        description: Análise de conteúdo.
+
+      - name: date_event
+        description: Data do evento.
+
+      - name: load_date
+        description: Data de carga no satélite.

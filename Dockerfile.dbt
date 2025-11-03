@@ -4,22 +4,20 @@ FROM python:3.11-slim
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     curl \
+    libpq-dev \
+    git \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Corrige erro do protobuf
-RUN pip install protobuf==3.20.3
+# Instalar dbt com PostgreSQL
+RUN docker pull ghcr.io/dbt-labs/dbt-postgres:1.9.latest
+RUN docker pull postgres:latest
 
-# Instala o DBT core + plugin DuckDB
-RUN pip install --no-cache-dir \
-    dbt-core==1.7.9 \
-    dbt-duckdb==1.7.1
+# Instalar pacotes Python adicionais
+RUN pip install psycopg2-binary pandas
 
-# Instala DuckDB CLI (linha de comando) corretamente
-RUN curl https://install.duckdb.org | sh && \
-    echo 'export PATH="/root/.duckdb/cli/latest:$PATH"' >> ~/.bashrc
 
-# Cria diretório de trabalho
-WORKDIR /usr/app
+# Diretório de trabalho
+WORKDIR /workspace
 
-# Comando default
-CMD ["dbt", "--help"]
+# Entrypoint
+CMD ["tail", "-f", "/dev/null"]
