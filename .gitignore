@@ -3,3 +3,4 @@ data/*
 workspace/data/
 workspace/logs/
 .ipynb_checkpoints
+.env

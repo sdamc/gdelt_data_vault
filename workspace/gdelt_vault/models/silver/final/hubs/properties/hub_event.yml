@@ -1,0 +1,20 @@
+version: 2
+
+models:
+  - name: hub_event
+    description: Hub de eventos extraídos da GKG com hash key baseada no GKG ID.
+    columns:
+      - name: event_hk
+        description: Hash key do evento (surrogate key).
+        tests:
+          - unique
+          - not_null
+
+      - name: gkg_id
+        description: GKG ID original da GDELT.
+
+      - name: date_id
+        description: Data do evento extraída do GKG ID (formato YYYYMMDD).
+
+      - name: load_date
+        description: Data de carga no hub.

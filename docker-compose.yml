@@ -1,4 +1,3 @@
-version: '3.8'
 
 services:
   jupyter_spark:
@@ -13,23 +12,26 @@ services:
       - ./:/workspace 
     restart: unless-stopped
 
-  dbt_duckdb:
-    build:
-      context: .
-      dockerfile: Dockerfile.dbt
-    image: dbt-duckdb:1.7
-    container_name: dbt_duckdb
+  postgres:
+    image: postgres:15
+    container_name: dv_postgres
+    env_file:
+      - .env
+    environment:
+      POSTGRES_DB: gdelt
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
-      - ./:/workspace
-    working_dir: /workspace
-    entrypoint: ["tail", "-f", "/dev/null"]
+      - ./workspace/data/silver:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
     restart: unless-stopped
 
   airflow:
     image: apache/airflow:2.7.1-python3.10
     container_name: airflow
     depends_on:
-      - dbt_duckdb
+      - postgres
     environment:
       - AIRFLOW__CORE__LOAD_EXAMPLES=False
       - AIRFLOW__CORE__EXECUTOR=SequentialExecutor
@@ -40,3 +42,15 @@ services:
       - "8080:8080"
     command: standalone
     restart: unless-stopped
+
+  dbt_postgres:
+    image: ghcr.io/dbt-labs/dbt-postgres:1.9.latest
+    container_name: dbt_postgres
+    volumes:
+      - ./:/workspace
+    depends_on:
+      - postgres
+    working_dir: /workspace
+    entrypoint: ["tail", "-f", "/dev/null"]
+    restart: unless-stopped
+
