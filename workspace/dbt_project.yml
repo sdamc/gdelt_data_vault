@@ -11,6 +11,7 @@ profile: 'gdelt_vault'
 # These configurations specify where dbt should look for different types of files.
 # The `model-paths` config, for example, states that models in this project can be
 # found in the "models/" directory. You probably won't need to change these!
+target-path: "/tmp/dbt_target"
 model-paths: ["models", "gdelt_vault/models"]
 analysis-paths: ["analyses", "gdelt_vault/analyses"]
 test-paths: ["tests", "gdelt_vault/tests"]

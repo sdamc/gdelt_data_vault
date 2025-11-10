@@ -2,7 +2,9 @@ import os
 import psycopg2
 
 # Configurações
-BRONZE_DIR = "./data/raw/bronze"
+# Use an absolute path so running from any working directory inside the container works.
+# Resolves previous relative path issue (./data/raw/bronze would incorrectly point inside scripts/).
+BRONZE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "data", "raw", "bronze"))
 TABLE_NAME = "staging_gkg_corruption"
 
 # Arquivos de entrada
@@ -15,12 +17,17 @@ def list_gkg_files():
 
 # Conexão com o PostgreSQL
 def get_connection():
+    """Return a Postgres connection.
+
+    Host updated from 'dv_postgres' to 'postgres' (docker-compose service name) so DNS resolves inside
+    the Docker network. Using the service name is more portable even if container_name differs.
+    """
     return psycopg2.connect(
-        host="dv_postgres",
+        host="postgres",  # docker-compose service name
         port=5432,
         dbname="gdelt",
         user="gdelt_user",
-        password="gdelt_pass"
+        password="gdelt_pass",
     )
 
 # Criação da tabela (executar apenas uma vez ou usar IF NOT EXISTS)

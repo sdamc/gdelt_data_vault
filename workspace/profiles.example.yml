@@ -1,0 +1,15 @@
+gdelt_vault:
+  target: dev
+  outputs:
+    dev:
+      type: postgres
+      host: postgres
+      user: YOUR_DB_USER            # or ${DBT_USER}
+      password: YOUR_DB_PASSWORD    # or ${DBT_PASSWORD}
+      dbname: gdelt
+      schema: aml                   # target schema (e.g. aml)
+      port: 5432
+      threads: 4
+
+# Copy this file to profiles.yml and replace placeholders or rely on env vars.
+# Ensure real credentials (user/password) are NOT committed – profiles.yml is ignored.

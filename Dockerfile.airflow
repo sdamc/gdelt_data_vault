@@ -1,0 +1,9 @@
+FROM apache/airflow:2.8.1-python3.10
+
+# Recommended way per Airflow docs: switch to airflow user for installing additional packages
+USER airflow
+RUN pip install --no-cache-dir dbt-postgres==1.9.0 \
+    && rm -rf ~/.cache/pip
+
+# Optional: print versions for debugging at container start
+CMD ["bash", "-c", "echo 'Airflow version:' $(airflow version); echo 'dbt version:' $(dbt --version | head -n1); rm -f /opt/airflow/airflow-webserver.pid; airflow db migrate && airflow webserver & airflow scheduler"]
