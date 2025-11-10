@@ -1,6 +1,61 @@
-# Ignore all contents of data/
-data/*
-workspace/data/
-workspace/logs/
-.ipynb_checkpoints
+#############################
+# Global .gitignore (root)  #
+#############################
+
+# ------------------------------------------------------------------
+# Data lake artifacts (raw/bronze/silver) – very large & reproducible
+# Keep a README to document acquisition; everything else ignored.
+# ------------------------------------------------------------------
+workspace/data/*
+!workspace/data/README.md
+
+# dbt build artifacts & downloaded packages
+workspace/target/
+workspace/dbt_packages/
+workspace/gdelt_vault/target/
+workspace/gdelt_vault/logs/
+
+# Airflow runtime artifacts & logs
+airflow/logs/
+airflow/tmp/
+
+# Generic logs & temp folders anywhere
+**/logs/
+**/tmp/
+*.log
+
+# Python cache / compiled objects
+**/__pycache__/
+*.pyc
+*.pyo
+
+# Jupyter checkpoints
+**/.ipynb_checkpoints/
+
+# Environment & secrets
 .env
+workspace/profiles.yml
+
+# OS/editor noise
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+
+# Node / front-end (future-proofing if added later)
+node_modules/
+
+# Docker local overrides
+docker-compose.override.yml
+
+# VSCode settings (optional – comment out to track)
+.vscode/
+
+# Allow seeds, macros, models, and example profiles
+!workspace/gdelt_vault/seeds/**
+!workspace/gdelt_vault/macros/**
+!workspace/gdelt_vault/models/**
+!workspace/gdelt_vault/tests/**
+
+# If you introduce sampled data for testing, place in workspace/data/sample and un-ignore:
+# !workspace/data/sample/**

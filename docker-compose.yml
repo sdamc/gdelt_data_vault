@@ -28,19 +28,29 @@ services:
     restart: unless-stopped
 
   airflow:
-    image: apache/airflow:2.7.1-python3.10
+    build:
+      context: .
+      dockerfile: Dockerfile.airflow
     container_name: airflow
     depends_on:
       - postgres
     environment:
       - AIRFLOW__CORE__LOAD_EXAMPLES=False
-      - AIRFLOW__CORE__EXECUTOR=SequentialExecutor
-      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=sqlite:////opt/airflow/airflow.db
+      - AIRFLOW__CORE__EXECUTOR=LocalExecutor
+      - AIRFLOW__CORE__DAGS_FOLDER=/workspace/airflow/dags
+      - AIRFLOW__CORE__PARALLELISM=4
+      - AIRFLOW__CORE__DAG_CONCURRENCY=4
+      - AIRFLOW__WEBSERVER__WORKERS=2
+      - AIRFLOW__WEBSERVER__WEB_SERVER_WORKER_TIMEOUT=120
+      - AIRFLOW__LOGGING__LOGGING_LEVEL=INFO
+      - AIRFLOW__SCHEDULER__MAX_DAGRUNS_TO_CREATE_PER_LOOP=5
+      - AIRFLOW__SCHEDULER__MAX_TIS_PER_QUERY=32
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://gdelt_user:gdelt_pass@postgres:5432/airflow_meta
     volumes:
       - ./:/workspace
     ports:
       - "8080:8080"
-    command: standalone
+  # Startup handled by Dockerfile CMD (webserver + scheduler)
     restart: unless-stopped
 
   dbt_postgres:
