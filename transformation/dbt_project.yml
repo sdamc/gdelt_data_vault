@@ -1,0 +1,56 @@
+name: 'gdelt_aml_vault'
+version: '1.0.0'
+config-version: 2
+
+profile: 'gdelt_vault'
+
+model-paths: ["models"]
+analysis-paths: ["analyses"]
+test-paths: ["tests"]
+seed-paths: ["seeds"]
+macro-paths: ["macros"]
+snapshot-paths: ["snapshots"]
+
+target-path: "target"
+clean-targets:
+  - "target"
+  - "dbt_packages"
+
+vars:
+  load_date: '{{ run_started_at.strftime("%Y-%m-%d") }}'
+  load_datetime: '{{ run_started_at }}'
+
+models:
+  gdelt_aml_vault:
+    silver:
+      +database: pg_vault
+      intermediate:
+        +materialized: ephemeral
+        +schema: staging
+      final:
+        hubs:
+          +materialized: incremental
+          +schema: raw_vault
+          +tags: ['hub', 'gdelt']
+        links:
+          +materialized: incremental
+          +schema: raw_vault
+          +tags: ['link', 'gdelt']
+        sats:
+          +materialized: incremental
+          +schema: raw_vault
+          +tags: ['satellite', 'gdelt']
+    business_vault:
+      +materialized: view
+      +schema: business_vault
+    gold:
+      +materialized: table
+      +database: pg_vault
+      +schema: gold
+      +tags: ['gold', 'analytics']
+
+seeds:
+  gdelt_aml_vault:
+    +database: pg_vault
+    +schema: gold
+    +tags: ['dimension', 'reference_data']

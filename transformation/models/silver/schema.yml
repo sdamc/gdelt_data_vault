@@ -1,0 +1,69 @@
+version: 2
+
+models:
+  - name: hub_news
+    description: Hub containing unique news articles from GDELT GKG
+    columns:
+      - name: news_hkey
+        description: Hash key (MD5) of the GKG record ID
+        tests:
+          - unique
+          - not_null
+      - name: news_hkey_source
+        description: Natural key - GKG record ID
+      - name: load_datetime
+        description: When this record was loaded into the vault
+      - name: record_source
+        description: Source system identifier
+
+  - name: hub_country
+    description: Hub containing unique countries mentioned in news
+    columns:
+      - name: country_hkey
+        description: Hash key (MD5) of the country code
+        tests:
+          - unique
+          - not_null
+      - name: country_hkey_source
+        description: Natural key - ISO 2-letter country code
+      - name: load_datetime
+        description: When this record was loaded into the vault
+      - name: record_source
+        description: Source system identifier
+
+  - name: sat_news_tone
+    description: Satellite containing sentiment/tone information for each news article
+    columns:
+      - name: news_hkey
+        description: Foreign key to hub_news
+        tests:
+          - not_null
+      - name: news_hashdiff
+        description: Hash of all descriptive attributes
+      - name: tone_overall
+        description: Overall tone score (-100 to +100, negative = bad news)
+      - name: tone_positive
+        description: Positive sentiment score
+      - name: tone_negative
+        description: Negative sentiment score
+      - name: tone_polarity
+        description: Polarity/emotional intensity
+      - name: tone_activity
+        description: Activity density score
+
+  - name: link_news_country
+    description: Link connecting news articles to the countries they mention
+    columns:
+      - name: news_country_hkey
+        description: Hash key of news_hkey + country_hkey
+        tests:
+          - unique
+          - not_null
+      - name: news_hkey
+        description: Foreign key to hub_news
+        tests:
+          - not_null
+      - name: country_hkey
+        description: Foreign key to hub_country
+        tests:
+          - not_null
