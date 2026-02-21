@@ -7,16 +7,7 @@
 # Bronze CSVs are large & reproducible from GDELT API
 # Silver/Gold stored in PostgreSQL (binary data directory)
 # ------------------------------------------------------------------
-data/bronze/*.csv
-data/bronze/*.bronze.csv
-data/silver/*
-!data/silver/.gitkeep
-data/gold/*
-!data/gold/.gitkeep
-
-# DuckDB analytical engine database file
-data/*.duckdb
-data/*.duckdb.wal
+data/
 
 # dbt build artifacts & downloaded packages
 transformation/target/

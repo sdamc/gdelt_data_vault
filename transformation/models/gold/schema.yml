@@ -1,0 +1,122 @@
+version: 2
+
+seeds:
+  - name: dim_country
+    description: >
+      Country dimension table containing geographic and administrative metadata.
+      Hardcoded reference data for all countries tracked in GDELT news analysis.
+    config:
+      database: pg_vault
+      schema: gold
+    columns:
+      - name: country_code
+        description: ISO 3166-1 alpha-2 country code (2 letters)
+        tests:
+          - not_null
+          - unique
+      - name: country_name
+        description: Full country name in English
+        tests:
+          - not_null
+      - name: capital_city
+        description: Name of the country's capital city
+      - name: capital_latitude
+        description: Latitude of the capital city (decimal degrees)
+      - name: capital_longitude
+        description: Longitude of the capital city (decimal degrees)
+      - name: continent
+        description: Continent name
+      - name: region
+        description: UN geographic region classification
+
+models:
+  - name: fact_monthly_country_sentiment
+    description: >
+      Monthly grain fact table aggregating AML news sentiment by country.
+      Contains volume metrics and comprehensive tone analysis for risk assessment.
+    columns:
+      - name: month_date
+        description: First day of the month (grain of aggregation)
+        tests:
+          - not_null
+      - name: country_code
+        description: ISO 2-letter country code (foreign key to dim_country)
+        tests:
+          - not_null          
+      
+      # Volume Metrics
+      - name: unique_news_count
+        description: Count of distinct news articles mentioning this country in this month
+      - name: unique_sources
+        description: Count of distinct news source domains
+      - name: total_word_count
+        description: Sum of word counts across all articles
+      
+      # Tone Metrics - Central Tendency
+      - name: avg_tone_overall
+        description: >
+          Average overall sentiment score (-10 to +10).
+          Negative values indicate negative sentiment (bad news).
+          Primary indicator for AML risk.
+      - name: avg_tone_positive
+        description: Average percentage of positive words (0-100)
+      - name: avg_tone_negative
+        description: >
+          Average percentage of negative words (0-100).
+          Higher values indicate more severe/harsh language.
+      - name: avg_tone_polarity
+        description: >
+          Average polarity (absolute difference between positive and negative).
+          High values indicate controversial/polarizing topics.
+      - name: avg_tone_activity
+        description: Average activity/energy level in the text
+      
+      # Tone Metrics - Dispersion
+      - name: stddev_tone_overall
+        description: Standard deviation of overall tone (measures consistency)
+      - name: stddev_tone_negative
+        description: Standard deviation of negative tone
+      
+      # Tone Metrics - Range
+      - name: min_tone_overall
+        description: Most negative tone score in the month
+      - name: max_tone_overall
+        description: Most positive tone score in the month
+      - name: min_tone_negative
+        description: Minimum negative tone percentage
+      - name: max_tone_negative
+        description: Maximum negative tone percentage (worst case)
+      
+      # Tone Metrics - Distribution
+      - name: p25_tone_overall
+        description: 25th percentile of overall tone
+      - name: median_tone_overall
+        description: Median (50th percentile) of overall tone
+      - name: p75_tone_overall
+        description: 75th percentile of overall tone
+      
+      # Derived Risk Metrics
+      - name: risk_intensity_score
+        description: >
+          Risk score derived from negative sentiment (0-100).
+          Formula: abs(avg_tone_overall) * 10 when negative, 0 when positive.
+          Higher = more AML risk concern.
+      - name: coverage_intensity_score
+        description: >
+          Log-scaled news volume score.
+          Formula: ln(unique_news_count + 1) * 10.
+          Indicates media attention intensity.
+      - name: sentiment_volatility_flag
+        description: >
+          Classification of sentiment consistency (High/Medium/Low Volatility).
+          High volatility suggests conflicting narratives or evolving situations.
+      - name: negativity_ratio
+        description: >
+          Ratio of avg_tone_negative to avg_tone_positive.
+          Values > 1 indicate negative tone dominates.
+      - name: sentiment_category
+        description: >
+          Categorical classification of avg_tone_overall
+          (Very Negative/Negative/Neutral/Positive/Very Positive)
+      - name: fact_created_at
+        description: Timestamp when this fact row was created/updated

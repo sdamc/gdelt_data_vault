@@ -1,0 +1,13 @@
+version: 2
+
+# Staging table is populated by load_staging.py script
+# Run before dbt: python /workspace/transformation/scripts/load_staging.py
+
+sources:
+  - name: staging
+    description: Staging layer - populated by Python script from bronze CSVs
+    database: pg_vault
+    schema: staging
+    tables:
+      - name: stg_gkg_news
+        description: Parsed GDELT GKG news with sentiment scores and country arrays
