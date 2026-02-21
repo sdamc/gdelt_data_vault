@@ -2,3 +2,12 @@ pandas
 requests
 tqdm
 notebook
+psycopg2-binary
+sqlalchemy
+dbt-duckdb>=1.8.0
+duckdb>=1.0.0
+beautifulsoup4
+newspaper3k
+lxml
+ollama
+pycountry-convert

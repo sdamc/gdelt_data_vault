@@ -1,9 +1,18 @@
 FROM apache/airflow:2.8.1-python3.10
 
-# Recommended way per Airflow docs: switch to airflow user for installing additional packages
+# Copy requirements file and entrypoint
+COPY requirements.txt /tmp/requirements.txt
+COPY airflow-entrypoint.sh /usr/local/bin/airflow-entrypoint.sh
+
+# Switch to root to set permissions
+USER root
+RUN chmod +x /usr/local/bin/airflow-entrypoint.sh
+
+# Switch to airflow user and install Python dependencies
 USER airflow
-RUN pip install --no-cache-dir dbt-postgres==1.9.0 \
+RUN pip install --no-cache-dir -r /tmp/requirements.txt \
+    && pip install --no-cache-dir dbt-postgres==1.9.0 dbt-duckdb>=1.8.0 duckdb>=1.0.0 \
     && rm -rf ~/.cache/pip
 
-# Optional: print versions for debugging at container start
-CMD ["bash", "-c", "echo 'Airflow version:' $(airflow version); echo 'dbt version:' $(dbt --version | head -n1); rm -f /opt/airflow/airflow-webserver.pid; airflow db migrate && airflow webserver & airflow scheduler"]
+# Use the entrypoint script
+ENTRYPOINT ["/usr/local/bin/airflow-entrypoint.sh"]

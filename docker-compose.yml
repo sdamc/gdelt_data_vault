@@ -1,17 +1,5 @@
 
 services:
-  jupyter_spark:
-    build:
-      context: .
-      dockerfile: Dockerfile.spark
-    container_name: jupyter_spark
-    user: jupyter
-    ports:
-      - "8888:8888"
-    volumes:
-      - ./:/workspace 
-    restart: unless-stopped
-
   postgres:
     image: postgres:15
     container_name: dv_postgres
@@ -22,7 +10,7 @@ services:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
-      - ./workspace/data/silver:/var/lib/postgresql/data
+      - ./data/silver:/var/lib/postgresql/data
     ports:
       - "5432:5432"
     restart: unless-stopped
@@ -34,7 +22,14 @@ services:
     container_name: airflow
     depends_on:
       - postgres
+    env_file:
+      - .env
     environment:
+      - POSTGRES_DB=gdelt
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
       - AIRFLOW__CORE__LOAD_EXAMPLES=False
       - AIRFLOW__CORE__EXECUTOR=LocalExecutor
       - AIRFLOW__CORE__DAGS_FOLDER=/workspace/airflow/dags
@@ -53,14 +48,11 @@ services:
   # Startup handled by Dockerfile CMD (webserver + scheduler)
     restart: unless-stopped
 
-  dbt_postgres:
-    image: ghcr.io/dbt-labs/dbt-postgres:1.9.latest
-    container_name: dbt_postgres
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
     volumes:
-      - ./:/workspace
-    depends_on:
-      - postgres
-    working_dir: /workspace
-    entrypoint: ["tail", "-f", "/dev/null"]
+      - ./data/ollama:/root/.ollama
+    ports:
+      - "11434:11434"
     restart: unless-stopped
-
