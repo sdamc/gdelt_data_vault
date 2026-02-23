@@ -1,19 +1,19 @@
 {{
   config(
-    materialized='table',
+    materialized='incremental',
     database='pg_vault',
     schema='gold',
-    unique_key=['news_hkey', 'category'],
-    tags=['gold', 'ai_insights', 'fact']
+    tags=['gold', 'ai_insights', 'fact'],
+    on_schema_change='sync_all_columns'
   )
 }}
 
 -- Gold Table: AI-Generated News Insights
--- Contains AI-powered abstracts for top sentiment news articles
--- Populated by ai_news_insights.py script
+-- Contains AI-powered abstracts for AML news articles
+-- Data populated by insights/ai_insights_generator.py
 
--- This table is managed by the Python ingestion script
--- Run: python ingestion/ai_news_insights.py
+-- Using incremental materialization so dbt doesn't drop/recreate the table
+-- This preserves the unique constraint needed for ON CONFLICT
 
 -- Schema only definition (data loaded via Python script)
 SELECT 

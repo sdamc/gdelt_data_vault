@@ -13,26 +13,33 @@ from sqlalchemy import create_engine
 def load_bronze_to_staging():
     """Read bronze CSV files and load into PostgreSQL staging table"""
     
-    # Database connection
-    db_user = os.getenv('POSTGRES_USER', 'gdelt_user')
-    db_pass = os.getenv('POSTGRES_PASSWORD', 'gdelt_pass')
-    db_host = 'postgres'
-    db_name = 'gdelt'
+    # Database connection from environment variables
+    db_user = os.getenv('POSTGRES_USER')
+    db_pass = os.getenv('POSTGRES_PASSWORD')
+    db_host = os.getenv('POSTGRES_HOST', 'postgres')
+    db_name = os.getenv('POSTGRES_DB', 'gdelt')
+    
+    # Validate required credentials
+    if not db_user or not db_pass:
+        raise EnvironmentError(
+            "Missing required environment variables: POSTGRES_USER and/or POSTGRES_PASSWORD. "
+            "Please set them in docker-compose.yml environment."
+        )
     
     engine = create_engine(f'postgresql://{db_user}:{db_pass}@{db_host}:5432/{db_name}')
     
-    # Find all bronze files (2025+ only to avoid processing old data)
+    # Find all bronze files (2026+ only to avoid processing old data)
     bronze_path = '/workspace/data/bronze'
     file_pattern = f'{bronze_path}/*.bronze.csv'
     all_files = sorted(glob.glob(file_pattern))
     
-    # Filter to only 2025+ files
-    files = [f for f in all_files if os.path.basename(f).startswith('2025')]
+    # Filter to only 2026+ files
+    files = [f for f in all_files if os.path.basename(f).startswith('2026')]
     
     if not files:
-        raise FileNotFoundError(f"No 2025+ bronze files found at {bronze_path}")
+        raise FileNotFoundError(f"No 2026+ bronze files found at {bronze_path}")
     
-    print(f"📁 Found {len(files)} bronze files from 2025+ (skipped {len(all_files) - len(files)} older files)")
+    print(f"📁 Found {len(files)} bronze files from 2026+ (skipped {len(all_files) - len(files)} older files)")
     
     # Read all CSV files
     dfs = []

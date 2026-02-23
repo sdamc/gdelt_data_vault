@@ -14,7 +14,7 @@ THEMES = ["ECON_MONEYLAUNDERING", "WB_2076_MONEY_LAUNDERING"]
 
 def get_next_ts(current_ts: int) -> int:
     if current_ts == 0:
-        return 20250101000000  # Start from 2025-01-01 (updated from 2016)
+        return 20260101000000  # Start from 2026-01-01 (updated from 2025)
     dt = datetime.strptime(str(current_ts), "%Y%m%d%H%M%S")
     next_dt = dt + timedelta(minutes=15)
     return int(next_dt.strftime("%Y%m%d%H%M%S"))
@@ -34,16 +34,16 @@ def run_gdelt_ingestion(run_id: str, max_files: int = 17280, output_path: str = 
     meta.init_run(conn, run_id, DATASET, max_files_per_run=max_files)
     last_watermark = meta.get_last_watermark(conn, DATASET)
     
-    # Priority: explicit start_from_ts > ensure starting from 2025 > watermark
+    # Priority: explicit start_from_ts > ensure starting from 2026 > watermark
     if start_from_ts is not None:
         current_ts = start_from_ts
         print(f"🎯 Using explicit start timestamp: {current_ts}")
-    elif last_watermark == 0 or last_watermark < 20250101000000:
-        # Force start from 2025 if watermark is before 2025
-        current_ts = 20250101000000
-        print(f"🎯 Starting from 2025-01-01 (watermark was {last_watermark})")
+    elif last_watermark == 0 or last_watermark < 20260101000000:
+        # Force start from 2026 if watermark is before 2026
+        current_ts = 20260101000000
+        print(f"🎯 Starting from 2026-01-01 (watermark was {last_watermark})")
     else:
-        # Continue from watermark only if already in 2025+
+        # Continue from watermark only if already in 2026+
         current_ts = get_next_ts(last_watermark)
         print(f"🔄 Continuing from watermark: {current_ts}")
     
@@ -137,17 +137,17 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Download GDELT GKG files filtered for AML themes')
     parser.add_argument('--output', type=str, default=BRONZE_PATH, help='Output directory for bronze CSV files')
     parser.add_argument('--max-files', type=int, default=MAX_FILES_PER_RUN, help='Maximum files to download per run (default: 17,280 = ~6 months)')
-    parser.add_argument('--reset-watermark', action='store_true', help='Reset watermark to 0 (script will auto-start from 2025-01-01)')
+    parser.add_argument('--reset-watermark', action='store_true', help='Reset watermark to 0 (script will auto-start from 2026-01-01)')
     parser.add_argument('--start-from', type=str, help='Start from specific timestamp (format: YYYYMMDDHHMMSS), overrides watermark')
     args = parser.parse_args()
     
-    # Handle watermark reset (optional - script auto-starts from 2025 if watermark < 2025)
+    # Handle watermark reset (optional - script auto-starts from 2026 if watermark < 2026)
     if args.reset_watermark:
         conn = meta.get_connection()
         meta.create_state_tables(conn)  # Ensure tables exist
         
-        start_ts = 0  # Will auto-start from 20250101000000
-        print(f"🔄 Resetting watermark to 0 (script will auto-start from 2025-01-01)")
+        start_ts = 0  # Will auto-start from 20260101000000
+        print(f"🔄 Resetting watermark to 0 (script will auto-start from 2026-01-01)")
         
         with conn.cursor() as cur:
             cur.execute("""

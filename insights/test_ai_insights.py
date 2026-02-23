@@ -22,13 +22,21 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Database connection parameters
+# Note: Queries PostgreSQL Data Vault directly (NOT DuckDB)
 DB_CONFIG = {
-    'host': os.getenv('POSTGRES_HOST', 'localhost'),
+    'host': os.getenv('POSTGRES_HOST', 'postgres'),
     'port': os.getenv('POSTGRES_PORT', '5432'),
     'database': os.getenv('POSTGRES_DB', 'gdelt'),
-    'user': os.getenv('POSTGRES_USER', 'gdelt_user'),
-    'password': os.getenv('POSTGRES_PASSWORD', 'gdelt_pass')
+    'user': os.getenv('POSTGRES_USER'),
+    'password': os.getenv('POSTGRES_PASSWORD')
 }
+
+# Validate required environment variables
+if not DB_CONFIG['user'] or not DB_CONFIG['password']:
+    raise EnvironmentError(
+        "Missing required environment variables: POSTGRES_USER and/or POSTGRES_PASSWORD. "
+        "Please check your docker-compose environment settings."
+    )
 
 # Ollama configuration
 OLLAMA_HOST = os.getenv('OLLAMA_HOST', 'http://ollama:11434')
@@ -42,7 +50,8 @@ def fetch_article_text(url: str, timeout: int = 10) -> Optional[str]:
     """Fetch and extract article text from URL."""
     try:
         headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+            # Modern User-Agent: Chrome 120 on Windows 11
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
         }
         response = requests.get(url, timeout=timeout, headers=headers)
         response.raise_for_status()
@@ -106,15 +115,15 @@ def generate_ai_summary(article_text: str, tone: float, max_words: int = 40) -> 
         if len(article_text) > max_chars:
             article_text = article_text[:max_chars] + "..."
         
-        prompt = f"""Summarize the following news article in exactly {max_words} words or fewer. 
-Focus on the key facts and events. Be concise and factual.
+        prompt = f"""Summarize the following news article in a maximum of {max_words} words. 
+Focus on the key facts and events. Be concise and factual. Do not exceed {max_words} words.
 
 Sentiment tone score: {tone:.2f} (range: -10 to +10)
 
 Article:
 {article_text}
 
-Summary (max {max_words} words):"""
+Summary (maximum {max_words} words):"""
         
         response = ollama_client.chat(
             model=OLLAMA_MODEL,
@@ -151,7 +160,7 @@ def query_top_negative_news(days: int = 7, limit: int = 10) -> List[Dict]:
         s.tone_negative,
         s.event_datetime
     FROM main_raw_vault.sat_news_tone s
-    WHERE s.event_datetime >= '2025-01-01'::date
+    WHERE s.event_datetime >= '2026-01-01'::date
       AND s.source_url IS NOT NULL
       AND s.tone_overall IS NOT NULL
       AND s.tone_overall < 0
@@ -190,7 +199,7 @@ def query_top_positive_news(days: int = 7, limit: int = 10) -> List[Dict]:
         s.tone_positive,
         s.event_datetime
     FROM main_raw_vault.sat_news_tone s
-    WHERE s.event_datetime >= '2025-01-01'::date
+    WHERE s.event_datetime >= '2026-01-01'::date
       AND s.source_url IS NOT NULL
       AND s.tone_overall IS NOT NULL
       AND s.tone_overall > 0
@@ -235,7 +244,7 @@ def query_polarizing_by_continent(days: int = 7) -> List[Dict]:
         INNER JOIN main_raw_vault.link_news_country l ON s.news_hkey = l.news_hkey
         INNER JOIN main_raw_vault.hub_country h ON l.country_hkey = h.country_hkey
         INNER JOIN main_gold.dim_country dc ON h.country_code = dc.country_code
-        WHERE s.event_datetime >= '2025-01-01'::date
+        WHERE s.event_datetime >= '2026-01-01'::date
           AND s.source_url IS NOT NULL
           AND s.tone_polarity IS NOT NULL
           AND dc.continent IS NOT NULL
