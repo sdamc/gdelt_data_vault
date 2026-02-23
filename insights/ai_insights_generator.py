@@ -23,13 +23,22 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Database connection parameters
+# Note: Queries PostgreSQL Data Vault directly (NOT DuckDB)
+# DuckDB is only used in dbt transformations, not in AI insights generation
 DB_CONFIG = {
-    'host': os.getenv('POSTGRES_HOST', 'localhost'),
+    'host': os.getenv('POSTGRES_HOST', 'postgres'),
     'port': os.getenv('POSTGRES_PORT', '5432'),
     'database': os.getenv('POSTGRES_DB', 'gdelt'),
-    'user': os.getenv('POSTGRES_USER', 'gdelt_user'),
-    'password': os.getenv('POSTGRES_PASSWORD', 'gdelt_pass')
+    'user': os.getenv('POSTGRES_USER'),
+    'password': os.getenv('POSTGRES_PASSWORD')
 }
+
+# Validate required environment variables
+if not DB_CONFIG['user'] or not DB_CONFIG['password']:
+    raise EnvironmentError(
+        "Missing required environment variables: POSTGRES_USER and/or POSTGRES_PASSWORD. "
+        "Please set them in .env file or docker-compose environment."
+    )
 
 # Ollama configuration
 OLLAMA_HOST = os.getenv('OLLAMA_HOST', 'http://ollama:11434')
@@ -46,7 +55,8 @@ def fetch_article_text(url: str, timeout: int = 10) -> Optional[str]:
     """
     try:
         headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+            # Modern User-Agent: Chrome 120 on Windows 11
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
         }
         response = requests.get(url, headers=headers, timeout=timeout, allow_redirects=True)
         response.raise_for_status()
@@ -79,42 +89,12 @@ def fetch_article_text(url: str, timeout: int = 10) -> Optional[str]:
         return None
 
 
-def validate_aml_relevance(article_text: str) -> bool:
+def validate_and_summarize_aml(article_text: str, tone: float, max_words: int = 40) -> Tuple[bool, Optional[str]]:
     """
-    Use LLM to validate if article is truly about money laundering/AML.
-    Returns True if article is relevant to AML/financial crimes.
-    """
-    try:
-        # Truncate to first 1000 chars for quick validation
-        sample = article_text[:1000] if len(article_text) > 1000 else article_text
-        
-        prompt = f"""Is this article primarily about money laundering, anti-money laundering (AML), 
-financial crimes, corruption, fraud, or illegal financial activities?
-
-Answer ONLY with YES or NO.
-
-Article excerpt:
-{sample}
-
-Answer:"""
-        
-        response = ollama_client.chat(
-            model=OLLAMA_MODEL,
-            messages=[{'role': 'user', 'content': prompt}]
-        )
-        
-        answer = response['message']['content'].strip().upper()
-        return 'YES' in answer
-        
-    except Exception as e:
-        logger.warning(f"AML validation failed: {str(e)} - defaulting to True")
-        return True  # Default to True if validation fails
-
-
-def generate_ai_summary(article_text: str, tone: float, max_words: int = 40) -> str:
-    """
-    Generate AI summary of article using Ollama.
-    Limits output to max_words.
+    OPTIMIZED: Single API call to validate AML relevance AND generate summary.
+    Returns: (is_aml_relevant, summary_or_none)
+    
+    This cuts API calls in half compared to separate validation + summarization.
     """
     try:
         # Truncate article if too long (to avoid token limits)
@@ -122,33 +102,43 @@ def generate_ai_summary(article_text: str, tone: float, max_words: int = 40) -> 
         if len(article_text) > max_chars:
             article_text = article_text[:max_chars] + "..."
         
-        prompt = f"""Summarize the following news article in exactly {max_words} words or fewer. 
-Focus on the key facts and events. Be concise and factual.
+        prompt = f"""Task: Analyze if this article is about money laundering, anti-money laundering (AML), financial crimes, corruption, fraud, or illegal financial activities.
+
+Instructions:
+1. If the article IS primarily about AML/financial crimes: Write ONLY a {max_words}-word maximum abstract. DO NOT include phrases like "Here is a summary", "Summary:", "This article is about", or any meta-text. Start directly with the content.
+2. If the article IS NOT about AML/financial crimes: Respond with exactly "NOT RELEVANT"
 
 Sentiment tone score: {tone:.2f} (range: -10 to +10)
 
 Article:
 {article_text}
 
-Summary (max {max_words} words):"""
+Response:"""
         
         response = ollama_client.chat(
             model=OLLAMA_MODEL,
             messages=[{'role': 'user', 'content': prompt}]
         )
         
-        summary = response['message']['content'].strip()
+        content = response['message']['content'].strip()
         
+        # Check if article is not relevant
+        if 'NOT RELEVANT' in content.upper():
+            return (False, None)
+        
+        # Article is relevant, content is the summary
         # Ensure word limit
-        words = summary.split()
+        words = content.split()
         if len(words) > max_words:
             summary = ' '.join(words[:max_words]) + '...'
+        else:
+            summary = content
         
-        return summary
+        return (True, summary)
         
     except Exception as e:
-        logger.error(f"AI summary generation failed: {str(e)}")
-        return f"Summary unavailable. Tone: {tone:.2f}"
+        logger.warning(f"AML validation+summary failed: {str(e)} - defaulting to relevant")
+        return (True, f"Summary unavailable. Tone: {tone:.2f}")
 
 
 def get_db_connection():
@@ -156,133 +146,83 @@ def get_db_connection():
     return psycopg2.connect(**DB_CONFIG)
 
 
-def query_top_negative_news(days: int = 7, limit: int = 10) -> List[Dict]:
-    """Query top 10 most negative news from last N days."""
+def get_last_processed_date() -> datetime:
+    """
+    Get the date of the most recent article already processed.
+    Returns the NEXT date to process (last processed + 1 day).
+    If no articles processed yet, returns 2026-01-01.
+    """
     query = """
-    SELECT 
-        s.news_hkey,
-        s.source_domain,
-        s.source_url,
-        s.tone_overall,
-        s.tone_negative,
-        s.event_datetime
-    FROM main_raw_vault.sat_news_tone s
-    WHERE s.event_datetime >= NOW() - INTERVAL '%s days'
-      AND s.source_url IS NOT NULL
-      AND s.tone_overall IS NOT NULL
-      AND s.tone_overall < 0
-    ORDER BY s.tone_overall ASC
-    LIMIT %s;
+    SELECT COALESCE(MAX(event_datetime::date), '2025-12-31'::date) + INTERVAL '1 day' as next_date
+    FROM main_gold.fact_ai_news_insights
     """
     
-    conn = get_db_connection()
-    cur = conn.cursor()
-    cur.execute(query, (days, limit))
-    
-    results = []
-    for row in cur.fetchall():
-        results.append({
-            'news_hkey': row[0],
-            'source': row[1],
-            'url': row[2],
-            'tone': row[3],
-            'category': 'negative'
-        })
-    
-    cur.close()
-    conn.close()
-    return results
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute(query)
+        next_date = cur.fetchone()[0]
+        cur.close()
+        conn.close()
+        
+        logger.info(f"Next date to process: {next_date.date()}")
+        return next_date
+    except Exception as e:
+        logger.warning(f"Could not retrieve last processed date: {e}")
+        logger.info("Defaulting to 2026-01-01")
+        return datetime(2026, 1, 1)
 
 
-def query_top_positive_news(days: int = 7, limit: int = 10) -> List[Dict]:
-    """Query top 10 most positive news from last N days."""
-    query = """
-    SELECT 
-        s.news_hkey,
-        s.source_domain,
-        s.source_url,
-        s.tone_overall,
-        s.tone_positive,
-        s.event_datetime
-    FROM main_raw_vault.sat_news_tone s
-    WHERE s.event_datetime >= NOW() - INTERVAL '%s days'
-      AND s.source_url IS NOT NULL
-      AND s.tone_overall IS NOT NULL
-      AND s.tone_overall > 0
-    ORDER BY s.tone_overall DESC
-    LIMIT %s;
+def query_articles_for_date(target_date: datetime) -> List[Dict]:
     """
+    Query ALL articles for a single date with country enrichment.
+    This processes one complete day at a time for comprehensive coverage.
     
-    conn = get_db_connection()
-    cur = conn.cursor()
-    cur.execute(query, (days, limit))
-    
-    results = []
-    for row in cur.fetchall():
-        results.append({
-            'news_hkey': row[0],
-            'source': row[1],
-            'url': row[2],
-            'tone': row[3],
-            'category': 'positive'
-        })
-    
-    cur.close()
-    conn.close()
-    return results
-
-
-def query_polarizing_by_continent(days: int = 7) -> List[Dict]:
-    """Query most polarizing news per continent (highest tone_polarity)."""
+    Returns all articles from target_date (00:00:00 to 23:59:59)
+    """
     query = """
-    WITH news_with_continent AS (
+    WITH articles_for_day AS (
         SELECT 
             s.news_hkey,
             s.source_domain,
             s.source_url,
             s.tone_overall,
+            s.tone_positive,
+            s.tone_negative,
             s.tone_polarity,
             s.event_datetime,
+            dc.country_name,
             dc.continent,
-            dc.country_name
+            -- If multiple countries, pick one arbitrarily
+            ROW_NUMBER() OVER (PARTITION BY s.news_hkey ORDER BY dc.country_name) as rn
         FROM main_raw_vault.sat_news_tone s
-        INNER JOIN main_raw_vault.link_news_country l ON s.news_hkey = l.news_hkey
-        INNER JOIN main_raw_vault.hub_country h ON l.country_hkey = h.country_hkey
-        INNER JOIN main_gold.dim_country dc ON h.country_code = dc.country_code
-        WHERE s.event_datetime >= NOW() - INTERVAL '%s days'
+        LEFT JOIN main_raw_vault.link_news_country l ON s.news_hkey = l.news_hkey
+        LEFT JOIN main_raw_vault.hub_country h ON l.country_hkey = h.country_hkey
+        LEFT JOIN main_gold.dim_country dc ON h.country_code = dc.country_code
+        WHERE s.event_datetime::date = %s::date
           AND s.source_url IS NOT NULL
-          AND s.tone_polarity IS NOT NULL
-          AND dc.continent IS NOT NULL
-    ),
-    ranked AS (
-        SELECT 
-            news_hkey,
-            source_domain,
-            source_url,
-            tone_overall,
-            tone_polarity,
-            continent,
-            country_name,
-            ROW_NUMBER() OVER (PARTITION BY continent ORDER BY tone_polarity DESC) as rn
-        FROM news_with_continent
+          AND s.tone_overall IS NOT NULL
     )
     SELECT 
         news_hkey,
         source_domain,
         source_url,
         tone_overall,
+        tone_positive,
+        tone_negative,
         tone_polarity,
-        continent,
-        country_name
-    FROM ranked
-    WHERE rn = 1;
+        event_datetime,
+        country_name,
+        continent
+    FROM articles_for_day
+    WHERE rn = 1
+    ORDER BY tone_overall ASC;  -- Process most negative first for priority
     """
     
     conn = get_db_connection()
     cur = conn.cursor()
-    cur.execute(query, (days,))
+    cur.execute(query, (target_date,))
     
-    # Return one news per continent
     results = []
     for row in cur.fetchall():
         results.append({
@@ -290,10 +230,12 @@ def query_polarizing_by_continent(days: int = 7) -> List[Dict]:
             'source': row[1],
             'url': row[2],
             'tone': row[3],
-            'polarity': row[4],
-            'continent': row[5],
-            'country': row[6],
-            'category': f'polarizing_{row[5]}'
+            'tone_positive': row[4],
+            'tone_negative': row[5],
+            'tone_polarity': row[6],
+            'event_datetime': row[7],
+            'country': row[8],  # May be NULL
+            'continent': row[9],  # May be NULL
         })
     
     cur.close()
@@ -302,7 +244,7 @@ def query_polarizing_by_continent(days: int = 7) -> List[Dict]:
 
 
 def insert_insights(insights: List[Dict]):
-    """Insert insights into gold.ai_news_insights table."""
+    """Insert insights into main_gold.fact_ai_news_insights table."""
     if not insights:
         logger.info("No insights to insert")
         return
@@ -311,23 +253,29 @@ def insert_insights(insights: List[Dict]):
     cur = conn.cursor()
     
     insert_query = """
-    INSERT INTO gold.ai_news_insights 
-        (source_domain, source_url, sentiment_score, ai_summary, category, generated_at)
+    INSERT INTO main_gold.fact_ai_news_insights 
+        (news_hkey, source_domain, source_url, event_datetime,
+         category, continent, country_name,
+         tone_overall, tone_positive, tone_negative, tone_polarity,
+         ai_abstract, generated_at)
     VALUES %s
-    ON CONFLICT (source_url, category) 
-    DO UPDATE SET
-        sentiment_score = EXCLUDED.sentiment_score,
-        ai_summary = EXCLUDED.ai_summary,
-        generated_at = EXCLUDED.generated_at;
+    ON CONFLICT (news_hkey, category) DO NOTHING;
     """
     
     values = [
         (
+            insight['news_hkey'],
             insight['source'],
             insight['url'],
+            insight['event_datetime'],
+            'daily_batch',  # Single category for all daily processed articles
+            insight.get('continent'),
+            insight.get('country'),
             insight['tone'],
+            insight.get('tone_positive'),
+            insight.get('tone_negative'),
+            insight.get('tone_polarity'),
             insight['summary'],
-            insight['category'],
             datetime.now()
         )
         for insight in insights
@@ -336,73 +284,106 @@ def insert_insights(insights: List[Dict]):
     execute_values(cur, insert_query, values)
     conn.commit()
     
-    logger.info(f"Inserted {len(insights)} insights into database")
+    logger.info(f"✅ Inserted {len(insights)} insights into main_gold.fact_ai_news_insights")
     
     cur.close()
     conn.close()
 
 
 def main():
-    """Main execution function."""
-    logger.info("Starting AI Insights Generator")
+    """
+    Main execution function.
+    Processes ALL articles from ONE DAY at a time, chronologically.
+    Each run processes the next unprocessed day starting from 2026-01-01.
+    """
+    logger.info("="*60)
+    logger.info("🚀 Starting AI Insights Generator (Daily Batch Mode)")
+    logger.info("="*60)
     
-    # Collect all news to process
-    logger.info("Querying top negative news...")
-    negative_news = query_top_negative_news(days=7, limit=10)
+    # Get next date to process
+    target_date = get_last_processed_date()
+    logger.info(f"📅 Processing date: {target_date.date()}")
     
-    logger.info("Querying top positive news...")
-    positive_news = query_top_positive_news(days=7, limit=10)
+    # Check if we've caught up to today
+    if target_date.date() > datetime.now().date():
+        logger.info("\n✅ All dates processed! System is up to date.")
+        logger.info(f"   Last processed: {(target_date - timedelta(days=1)).date()}")
+        return
     
-    logger.info("Querying polarizing news by continent...")
-    polarizing_news = query_polarizing_by_continent(days=7)
+    # Query ALL articles for this date
+    logger.info("\n📊 Querying all articles for this date...")
+    all_news = query_articles_for_date(target_date)
     
-    all_news = negative_news + positive_news + polarizing_news
-    logger.info(f"Total news items to process: {len(all_news)}")
+    if not all_news:
+        logger.info(f"\n⚠️  No articles found for {target_date.date()}")
+        logger.info("   This date will be skipped in future runs.")
+        return
     
-    # Process each news item
-    insights = []
+    logger.info(f"  └─ Found {len(all_news)} articles total")
+    logger.info("="*60)
+    
+    # Process each article with incremental saving
+    saved_count = 0
     skipped_not_aml = 0
+    skipped_fetch_failed = 0
     
     for i, news in enumerate(all_news, 1):
-        logger.info(f"Processing {i}/{len(all_news)}: {news['url']}")
+        logger.info(f"\n[{i}/{len(all_news)}] {target_date.date()} - Tone: {news['tone']:.2f}")
+        logger.info(f"  URL: {news['url'][:80]}...")
         
         # Fetch article text
         article_text = fetch_article_text(news['url'])
         
         if article_text:
-            # Validate AML relevance with LLM
-            logger.info(f"Validating AML relevance...")
-            is_aml_relevant = validate_aml_relevance(article_text)
+            # OPTIMIZED: Single API call for validation + summary
+            logger.info(f"  🤖 AI validation + summarization...")
+            is_aml_relevant, summary = validate_and_summarize_aml(article_text, news['tone'], max_words=40)
             
             if not is_aml_relevant:
-                logger.warning(f"✗ Article not AML-relevant, skipping")
+                logger.warning(f"  ✗ Not AML-relevant")
                 skipped_not_aml += 1
                 time.sleep(1)
                 continue
             
-            logger.info(f"✓ Article is AML-relevant")
-            
-            # Generate AI summary
-            summary = generate_ai_summary(article_text, news['tone'], max_words=40)
+            logger.info(f"  ✓ AML-relevant")
             news['summary'] = summary
-            insights.append(news)
-            logger.info(f"✓ Generated summary: {summary[:100]}...")
+            
+            # ✅ Save IMMEDIATELY to database (crash-resistant)
+            try:
+                insert_insights([news])
+                saved_count += 1
+                logger.info(f"  ✅ Saved to DB ({saved_count} total)")
+            except Exception as e:
+                logger.error(f"  ❌ Failed to save: {e}")
+                # Continue processing other articles
+            
+            logger.info(f"  ✓ {summary[:60]}...")
         else:
-            # Fallback summary
-            news['summary'] = f"Article unavailable. Sentiment: {news['tone']:.2f}"
-            insights.append(news)
-            logger.warning(f"✗ Could not fetch article, using fallback")
+            # Skip articles we can't fetch
+            logger.warning(f"  ✗ Could not fetch")
+            skipped_fetch_failed += 1
         
         # Rate limiting
         time.sleep(1)
     
-    # Insert into database
-    logger.info("Inserting insights into database...")
-    insert_insights(insights)
+    # No batch insert needed - already saved incrementally
     
-    logger.info("✅ AI Insights generation complete!")
-    logger.info(f"Processed: {len(insights)} items")
-    logger.info(f"Skipped (not AML-relevant): {skipped_not_aml} items")
+    # Final summary
+    logger.info("\n" + "="*60)
+    logger.info(f"✅ Date {target_date.date()} Processing Complete!")
+    logger.info("="*60)
+    logger.info(f"📊 Statistics for {target_date.date()}:")
+    logger.info(f"  ├─ Total articles scanned: {len(all_news)}")
+    logger.info(f"  ├─ AML-relevant articles saved: {saved_count}")
+    logger.info(f"  ├─ Not AML-relevant: {skipped_not_aml}")
+    logger.info(f"  └─ Fetch failed: {skipped_fetch_failed}")
+    logger.info("="*60)
+    
+    if saved_count > 0:
+        logger.info(f"\n💡 Next run will process: {(target_date + timedelta(days=1)).date()}")
+    else:
+        logger.info(f"\n⚠️  No AML articles found for {target_date.date()}")
+        logger.info(f"   Next run will process: {(target_date + timedelta(days=1)).date()}")
 
 
 if __name__ == "__main__":

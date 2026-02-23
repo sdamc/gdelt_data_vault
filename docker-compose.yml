@@ -7,8 +7,8 @@ services:
       - .env
     environment:
       POSTGRES_DB: gdelt
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_USER: gdelt_user
+      POSTGRES_PASSWORD: gdelt_pass
     volumes:
       - ./data/silver:/var/lib/postgresql/data
     ports:
@@ -28,8 +28,10 @@ services:
       - POSTGRES_DB=gdelt
       - POSTGRES_HOST=postgres
       - POSTGRES_PORT=5432
-      - POSTGRES_USER=${POSTGRES_USER}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_USER=gdelt_user
+      - POSTGRES_PASSWORD=gdelt_pass
+      - OLLAMA_HOST=http://ollama:11434
+      - OLLAMA_MODEL=llama3.2:3b
       - AIRFLOW__CORE__LOAD_EXAMPLES=False
       - AIRFLOW__CORE__EXECUTOR=LocalExecutor
       - AIRFLOW__CORE__DAGS_FOLDER=/workspace/airflow/dags
@@ -55,4 +57,20 @@ services:
       - ./data/ollama:/root/.ollama
     ports:
       - "11434:11434"
+    restart: unless-stopped
+
+  metabase:
+    image: metabase/metabase:latest
+    container_name: metabase
+    depends_on:
+      - postgres
+    ports:
+      - "3000:3000"
+    environment:
+      - MB_DB_TYPE=postgres
+      - MB_DB_DBNAME=metabase
+      - MB_DB_PORT=5432
+      - MB_DB_USER=gdelt_user
+      - MB_DB_PASS=gdelt_pass
+      - MB_DB_HOST=postgres
     restart: unless-stopped

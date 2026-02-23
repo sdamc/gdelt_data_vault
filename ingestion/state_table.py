@@ -95,8 +95,8 @@ def get_connection(
     - POSTGRES_HOST (default: 'postgres')
     - POSTGRES_PORT (default: 5432)
     - POSTGRES_DB (default: 'gdelt')
-    - POSTGRES_USER (default: 'airflow')
-    - POSTGRES_PASSWORD (default: 'airflow')
+    - POSTGRES_USER (required, no default)
+    - POSTGRES_PASSWORD (required, no default)
     
     Args:
         host: Database host
@@ -108,12 +108,28 @@ def get_connection(
     Returns:
         PostgreSQL connection object
     """
+    # Get credentials from environment if not provided
+    db_user = user or os.getenv('POSTGRES_USER')
+    db_password = password or os.getenv('POSTGRES_PASSWORD')
+    db_host = host or os.getenv('POSTGRES_HOST', 'postgres')
+    db_port = port or int(os.getenv('POSTGRES_PORT', '5432'))
+    db_database = database or os.getenv('POSTGRES_DB', 'gdelt')
+    
+    # Validate required credentials
+    if not db_user or not db_password:
+        raise EnvironmentError(
+            f"Missing database credentials! "
+            f"POSTGRES_USER={'set' if db_user else 'NOT SET'}, "
+            f"POSTGRES_PASSWORD={'set' if db_password else 'NOT SET'}. "
+            f"Please check environment variables in docker-compose.yml"
+        )
+    
     return psycopg2.connect(
-        host=host or os.getenv('POSTGRES_HOST', 'postgres'),
-        port=port or int(os.getenv('POSTGRES_PORT', '5432')),
-        database=database or os.getenv('POSTGRES_DB', 'gdelt'),
-        user=user or os.getenv('POSTGRES_USER', 'airflow'),
-        password=password or os.getenv('POSTGRES_PASSWORD', 'airflow')
+        host=db_host,
+        port=db_port,
+        database=db_database,
+        user=db_user,
+        password=db_password
     )
 
 
