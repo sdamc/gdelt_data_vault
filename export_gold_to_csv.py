@@ -44,7 +44,7 @@ total_insights = export_table_to_csv(
 
 # Export fact_weekly_country_sentiment
 total_weekly = export_table_to_csv(
-    "SELECT * FROM main_gold.fact_weekly_country_sentiment ORDER BY week_start_date DESC, country_name",
+    "SELECT * FROM main_gold.fact_weekly_country_sentiment ORDER BY week_date DESC, country_name",
     "fact_weekly_country_sentiment.csv"
 )
 
