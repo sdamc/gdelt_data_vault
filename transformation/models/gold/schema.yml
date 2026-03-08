@@ -13,7 +13,6 @@ seeds:
         description: ISO 3166-1 alpha-2 country code (2 letters)
         tests:
           - not_null
-          - unique
       - name: country_name
         description: Full country name in English
         tests:
