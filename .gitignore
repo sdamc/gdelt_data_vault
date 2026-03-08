@@ -49,3 +49,4 @@ docker-compose.override.yml
 !transformation/gdelt_vault/macros/**
 !transformation/gdelt_vault/models/**
 !transformation/gdelt_vault/tests/**
+missing_fips_codes.txt

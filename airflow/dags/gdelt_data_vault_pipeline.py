@@ -125,14 +125,7 @@ generate_ai_insights = BashOperator(
     dag=dag,
 )
 
-# Task 7: Build weekly sentiment aggregation from curated articles
-dbt_run_weekly_aggregation = BashOperator(
-    task_id="dbt_run_weekly_aggregation",
-    bash_command=f"{DBT_CMD} run --select fact_weekly_country_sentiment",
-    dag=dag,
-)
-
-# Task 8: Export gold tables to CSV for Tableau Public
+# Task 7: Export gold tables to CSV for Tableau Public
 export_gold_csv = BashOperator(
     task_id="export_gold_to_csv",
     bash_command=f"python {EXPORT_CSV_SCRIPT}",
@@ -140,7 +133,7 @@ export_gold_csv = BashOperator(
     dag=dag,
 )
 
-# Task 9: Run dbt tests
+# Task 8: Run dbt tests
 dbt_test = BashOperator(
     task_id="dbt_test_quality",
     bash_command=f"{DBT_CMD} test",
@@ -149,8 +142,8 @@ dbt_test = BashOperator(
 )
 
 # Pipeline dependencies
-# Bronze → Staging → Silver → Gold Schemas → AI Insights → Weekly Aggregation → CSV Export → Tests
-download_bronze >> load_staging >> dbt_seed >> dbt_run_silver >> dbt_run_gold_schemas >> generate_ai_insights >> dbt_run_weekly_aggregation >> export_gold_csv >> dbt_test
+# Bronze → Staging → Silver → Gold Schemas → AI Insights → CSV Export → Tests
+download_bronze >> load_staging >> dbt_seed >> dbt_run_silver >> dbt_run_gold_schemas >> generate_ai_insights >> export_gold_csv >> dbt_test
 
 if __name__ == "__main__":
     dag.test()
