@@ -7,9 +7,6 @@
   )
 }}
 
--- Hub: Unique Countries
--- Business Key: ISO 2-letter Country Code
-
 WITH source_data AS (
     SELECT DISTINCT
         UNNEST(string_to_array(trim(both '{}' from countries), ',')) AS country_code,

@@ -28,7 +28,6 @@ SELECT
     CAST(NULL AS FLOAT) as tone_positive,
     CAST(NULL AS FLOAT) as tone_negative,
     CAST(NULL AS FLOAT) as tone_polarity,
-    CAST(NULL AS INTEGER) as report_count,
     CAST(NULL AS TEXT) as ai_abstract,  -- AI-generated 40-word summary
     CAST(NULL AS TIMESTAMP) as generated_at
 WHERE 1=0  -- Return no rows, just schema

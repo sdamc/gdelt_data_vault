@@ -7,8 +7,6 @@
   )
 }}
 
--- Hub: Unique News Articles
--- Business Key: GKG Record ID
 
 WITH source_data AS (
     SELECT

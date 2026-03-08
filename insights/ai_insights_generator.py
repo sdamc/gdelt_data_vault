@@ -202,6 +202,7 @@ def query_articles_for_date(target_date: datetime) -> List[Dict]:
         WHERE s.event_datetime::date = %s::date
           AND s.source_url IS NOT NULL
           AND s.tone_overall IS NOT NULL
+          AND dc.country_name IS NOT NULL
     )
     SELECT 
         news_hkey,
