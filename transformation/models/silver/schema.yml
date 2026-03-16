@@ -1,0 +1,87 @@
+version: 2
+
+models:
+  - name: hub_news
+    description: Hub containing unique news articles from GDELT GKG
+    columns:
+      - name: news_hkey
+        description: Hash key (MD5) of the GKG record ID
+        tests:
+          - unique
+          - not_null
+      - name: gkg_record_id
+        description: Natural key - GKG record ID (business key)
+      - name: load_datetime
+        description: When this record was loaded into the vault
+      - name: record_source
+        description: Source system identifier
+
+  - name: hub_country
+    description: Hub containing unique countries mentioned in news
+    columns:
+      - name: country_hkey
+        description: Hash key (MD5) of the country code
+        tests:
+          - unique
+          - not_null
+      - name: country_code
+        description: Natural key - ISO 2-letter country code (business key)
+      - name: load_datetime
+        description: When this record was loaded into the vault
+      - name: record_source
+        description: Source system identifier
+
+  - name: sat_news_tone
+    description: Satellite containing sentiment/tone information for each news article
+    columns:
+      - name: news_hkey
+        description: Foreign key to hub_news
+        tests:
+          - not_null
+      - name: load_datetime
+        description: When this record was loaded into the vault
+        tests:
+          - not_null
+      - name: event_datetime
+        description: Timestamp when the news event occurred
+      - name: source_domain
+        description: News source domain (e.g., reuters.com)
+      - name: source_url
+        description: Full URL of the news article
+      - name: tone_overall
+        description: Overall tone score (-100 to +100, negative = bad news)
+      - name: tone_positive
+        description: Positive sentiment score (0-100)
+      - name: tone_negative
+        description: Negative sentiment score (0-100)
+      - name: tone_polarity
+        description: Polarity/emotional intensity
+      - name: tone_activity
+        description: Activity density score
+      - name: word_count
+        description: Number of words in the article
+      - name: hashdiff
+        description: Hash of all descriptive attributes for change detection
+      - name: record_source
+        description: Source system identifier
+
+  - name: link_news_country
+    description: Link connecting news articles to the countries they mention
+    columns:
+      - name: news_country_hkey
+        description: Hash key of news_hkey + country_hkey
+        tests:
+          - unique
+          - not_null
+      - name: news_hkey
+        description: Foreign key to hub_news
+        tests:
+          - not_null
+      - name: country_hkey
+        description: Foreign key to hub_country
+        tests:
+          - not_null
+      - name: load_datetime
+        description: When this record was loaded into the vault
+      - name: record_source
+        description: Source system identifier

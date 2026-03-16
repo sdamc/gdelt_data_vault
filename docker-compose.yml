@@ -1,0 +1,66 @@
+
+services:
+  postgres:
+    image: postgres:15
+    container_name: dv_postgres
+    env_file:
+      - .env
+    volumes:
+      - ./data/silver:/var/lib/postgresql/data
+    ports:
+      - "${HOST_BIND:-127.0.0.1}:5432:5432"
+    restart: unless-stopped
+
+  airflow:
+    build:
+      context: .
+      dockerfile: Dockerfile.airflow
+    container_name: airflow
+    depends_on:
+      - postgres
+    env_file:
+      - .env
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_HOST=${POSTGRES_HOST}
+      - POSTGRES_PORT=${POSTGRES_PORT}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - OLLAMA_HOST=${OLLAMA_HOST}
+      - OLLAMA_MODEL=${OLLAMA_MODEL}
+      - WORKSPACE_ROOT=${WORKSPACE_ROOT}
+      - BRONZE_PATH=${BRONZE_PATH}
+      - GOLD_PATH=${GOLD_PATH}
+      - AIRFLOW__CORE__LOAD_EXAMPLES=False
+      - AIRFLOW__CORE__EXECUTOR=LocalExecutor
+      - AIRFLOW__CORE__DAGS_FOLDER=/workspace/airflow/dags
+      - AIRFLOW__CORE__PARALLELISM=4
+      - AIRFLOW__CORE__DAG_CONCURRENCY=4
+      - AIRFLOW__WEBSERVER__WORKERS=2
+      - AIRFLOW__WEBSERVER__WEB_SERVER_WORKER_TIMEOUT=120
+      - AIRFLOW__LOGGING__LOGGING_LEVEL=INFO
+      - AIRFLOW__SCHEDULER__MAX_DAGRUNS_TO_CREATE_PER_LOOP=5
+      - AIRFLOW__SCHEDULER__MAX_TIS_PER_QUERY=32
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/airflow_meta
+    volumes:
+      - ./:/workspace
+    ports:
+      - "${HOST_BIND:-127.0.0.1}:8080:8080"
+  # Startup handled by Dockerfile CMD (webserver + scheduler)
+    restart: unless-stopped
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    volumes:
+      - ./data/ollama:/root/.ollama
+    ports:
+      - "${HOST_BIND:-127.0.0.1}:11434:11434"
+    restart: unless-stopped
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]

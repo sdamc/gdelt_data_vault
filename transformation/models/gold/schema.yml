@@ -1,0 +1,116 @@
+version: 2
+
+seeds:
+  - name: dim_country
+    description: >
+      Country dimension table containing geographic and administrative metadata.
+      Hardcoded reference data for all countries tracked in GDELT news analysis.
+    config:
+      database: pg_vault
+      schema: gold
+    columns:
+      - name: country_code
+        description: ISO 3166-1 alpha-2 country code (2 letters)
+        tests:
+          - not_null
+      - name: country_name
+        description: Full country name in English
+        tests:
+          - not_null
+      - name: capital_city
+        description: Name of the country's capital city
+      - name: capital_latitude
+        description: Latitude of the capital city (decimal degrees)
+      - name: capital_longitude
+        description: Longitude of the capital city (decimal degrees)
+      - name: continent
+        description: Continent name
+      - name: region
+        description: UN geographic region classification
+
+models:
+  - name: fact_ai_news_insights
+    description: >
+      AI-curated AML news articles with LLM-generated abstracts.
+      Article-level grain (one row per news article).
+      Country relationships handled separately in fact_countries via link_news_country.
+      Data populated by insights/ai_insights_generator.py via incremental loads.
+    columns:
+      - name: news_hkey
+        description: Business key from hub_news (primary key)
+        tests:
+          - not_null
+          - unique
+      - name: event_datetime
+        description: Timestamp when the news event occurred
+        tests:
+          - not_null
+      - name: source_domain
+        description: News source domain (e.g., reuters.com)
+        tests:
+          - not_null
+      - name: source_url
+        description: Full URL of the news article
+        tests:
+          - not_null
+      - name: tone_overall
+        description: Overall sentiment score (-10 to +10, negative = bad news)
+        tests:
+          - not_null
+      - name: tone_positive
+        description: Percentage of positive words (0-100)
+      - name: tone_negative
+        description: Percentage of negative words (0-100)
+      - name: tone_polarity
+        description: Polarity score (absolute difference between positive and negative)
+      - name: ai_abstract
+        description: AI-generated 40-word summary created by Ollama LLM
+        tests:
+          - not_null
+      - name: generated_at
+        description: Timestamp when AI abstract was generated
+        tests:
+          - not_null
+
+  - name: fact_countries
+    description: >
+      Weekly aggregated AML news metrics by country.
+      Derives from fact_ai_news_insights joined with link_news_country and dim_country.
+      Built via dbt (not Python script).
+    columns:
+      - name: week_date
+        description: Week start date (Monday, grain of aggregation)
+        tests:
+          - not_null
+      - name: country_name
+        description: Country name (foreign key to dim_country)
+        tests:
+          - not_null
+      - name: continent
+        description: Continent name
+      - name: article_count
+        description: Number of AI-validated articles mentioning this country this week
+      - name: unique_sources
+        description: Number of distinct news source domains
+      - name: avg_tone_overall
+        description: Average sentiment score for this country/week
+      - name: avg_tone_positive
+        description: Average positive tone percentage
+      - name: avg_tone_negative
+        description: Average negative tone percentage
+      - name: avg_tone_polarity
+        description: Average polarity score
+      - name: min_tone_overall
+        description: Most negative article tone this week
+      - name: max_tone_overall
+        description: Most positive article tone this week
+      - name: stddev_tone_overall
+        description: Standard deviation of tone (sentiment consistency)
+      - name: risk_intensity_score
+        description: Derived risk score (0-100, higher = more negative)
+      - name: sentiment_category
+        description: Categorical sentiment (Very Negative to Very Positive)
+      - name: sentiment_volatility
+        description: Volatility classification based on stddev
+      - name: fact_created_at
+        description: Timestamp when this fact was created/updated

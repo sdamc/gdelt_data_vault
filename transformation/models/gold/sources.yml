@@ -1,0 +1,12 @@
+version: 2
+
+sources:
+  - name: raw_vault
+    schema: main_raw_vault
+    database: pg_vault
+    description: Data Vault 2.0 tables (hubs, links, satellites)
+    tables:
+      - name: hub_country
+        description: Hub containing unique countries
+      - name: link_news_country
+        description: Link connecting news articles to countries (many-to-many)

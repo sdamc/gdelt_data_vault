@@ -1,0 +1,52 @@
+#############################
+# GDELT AML Data Vault      #
+#############################
+
+# ------------------------------------------------------------------
+# Data Files - Bronze, Silver, Gold layers
+# Bronze CSVs are large & reproducible from GDELT API
+# Silver/Gold stored in PostgreSQL (binary data directory)
+# ------------------------------------------------------------------
+data/
+
+# dbt build artifacts & downloaded packages
+transformation/target/
+transformation/dbt_packages/
+transformation/logs/
+transformation/.user.yml
+
+# Airflow runtime artifacts & logs
+airflow/logs/
+airflow/tmp/
+logs/
+
+# Generic temp folders
+**/tmp/
+*.log
+
+# Python cache / compiled objects
+**/__pycache__/
+*.pyc
+*.pyo
+
+# Environment & secrets
+.env
+transformation/profiles.yml
+
+# OS/editor noise
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+
+# Docker local overrides
+docker-compose.override.yml
+
+# VSCode settings (optional – uncomment to track)
+# .vscode/
+
+# Allow dbt project files
+!transformation/gdelt_vault/seeds/**
+!transformation/gdelt_vault/macros/**
+!transformation/gdelt_vault/models/**
+!transformation/gdelt_vault/tests/**
