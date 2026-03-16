@@ -9,7 +9,7 @@
 [![Docker](https://img.shields.io/badge/Docker-Compose-2496ED.svg)](https://www.docker.com/)
 
 > **Worldwide Anti-Money Laundering (AML) news articles powered by AI**  
-> A data platform for learning purposes that processes global news events from GDELT, procecess thorugh a well structured transformation pipeline, validates AML relevance using LLMs, and delivers actionable insights through interactive dashboards.
+> A data platform for learning purposes that processes global news events from GDELT, procecess through a well structured transformation pipeline, validates AML relevance using LLMs, and delivers actionable insights through interactive dashboards.
 
 ---
 
@@ -49,8 +49,6 @@ This platform automates the **end-to-end lifecycle** of AML risk intelligence:
 ---
 
 ## 🏗️ Architecture
-
-![GDELT AML Data Platform Architecture](docs/architecture.png)
 
 ```
 ┌──────────────────────────────────────────────────────────────────────────┐
@@ -158,12 +156,17 @@ gdelt_data_vault/
 │
 ├── transformation/
 │   ├── models/
-│   │   ├── silver/                         # Data Vault 2.0 (hubs, links, sats)
-│   │   ├── gold/
-│   │   │   ├── fact_ai_news_insights.sql   # AI-curated articles
-│   │   │   ├── fact_countries.sql          # Weekly country aggregates
-│   │   │   └── sources.yml                 # Raw vault source definitions
-│   │   └── schema.yml                      # dbt tests & documentation
+│   │   └── silver/ 
+│   │       ├── hub_country.sql       # Countries as entities
+│   │       ├── hub_news.sql          # News articles as entities
+│   │       ├── link_news_country.sql # key foi linking news, tones and countries
+│   │       ├── sat_news_tone.sql     # Tone as attribute
+│   │       └── schema.yml            # dbt tests & documentation               
+│   │   └── gold/
+│   │       ├── fact_ai_news_insights.sql   # AI-curated articles
+│   │       ├── fact_countries.sql          # Weekly country aggregates
+│   │       ├── sources.yml                 # Raw vault source definitions
+│   │       └── schema.yml                      # dbt tests & documentation
 │   ├── seeds/
 │   │   └── dim_country.csv                 # 160+ country reference data
 │   ├── scripts/
@@ -197,7 +200,7 @@ gdelt_data_vault/
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/yourusername/gdelt_data_vault.git
+   git clone https://github.com/sdamc/gdelt_data_vault.git
    cd gdelt_data_vault
    ```
 
